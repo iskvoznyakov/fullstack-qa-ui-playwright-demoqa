@@ -1,6 +1,9 @@
 import pytest
 from playwright.sync_api import sync_playwright
 from utils.allure_helpers import attach_screenshot, attach_page_source
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="function")
@@ -25,11 +28,19 @@ def page():
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
+    """Хук для скриншотов в Allure при падении теста."""
     outcome = yield
-    result = outcome.get_result()
+    report = outcome.get_result()
 
-    if result.when == "call" and result.failed:
+    if report.when == "call" and report.failed:
         page = item.funcargs.get("page")
         if page:
-            attach_screenshot(page, name="Failure Screenshot")
-            attach_page_source(page, name="Failure Page Source")
+            try:
+                attach_screenshot(page, name="FAILED Screenshot", timeout=5000)
+            except Exception as e:
+                logger.warning(f"Не удалось сделать скриншот при падении: {e}")
+
+            try:
+                attach_page_source(page, name="FAILED Page Source")
+            except Exception as e:
+                logger.warning(f"Не удалось получить page source: {e}")
